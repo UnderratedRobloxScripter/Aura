@@ -1,15 +1,13 @@
-import dotenv from "dotenv";
 import { Groq } from "groq-sdk";
 
-dotenv.config();
+// No dotenv, use Vercel env vars directly
+const API_KEY = process.env.GROQ_API_KEYS;
 
-const API_KEYS = process.env.GROQ_API_KEYS
-  ? process.env.GROQ_API_KEYS.split(",")
-  : [];
+if (!API_KEY) {
+  console.error("GROQ_API_KEYS is missing!");
+}
 
-const groqClients = API_KEYS.map(
-  key => new Groq({ apiKey: key.trim() })
-);
+const groqClient = new Groq({ apiKey: API_KEY });
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -19,7 +17,7 @@ export default async function handler(req, res) {
   try {
     const { messages } = req.body;
 
-    const completion = await groqClients[0].chat.completions.create({
+    const completion = await groqClient.chat.completions.create({
       messages,
       model: "llama-3.3-70b-versatile"
     });
@@ -29,6 +27,7 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    console.error(err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 }
