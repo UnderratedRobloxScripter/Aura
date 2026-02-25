@@ -52,7 +52,7 @@ async function generateAIResponse(messages, modelMode = 'Auto') {
     return data.content;
   } catch (error) {
     console.error('AI Generation Error:', error);
-    return "Aura's brain is fuzzy right now. 💔 (Error: " + error.message + ")";
+    return "An error occured, Please try again later. (Error: " + error.message + ")";
   }
 }
 
