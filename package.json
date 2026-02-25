@@ -1,12 +1,8 @@
 {
-  "name": "aura-ai-assistant",
+  "name": "aura-ai-app",
   "version": "1.0.0",
-  "description": "Aura AI Chat Interface with Secure Backend",
   "private": true,
   "scripts": {
-    "build": "mkdir -p out && cp -r . out || true"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+    "build": "mkdir -p out && cp -r . out --exclude=out || true"
+  }
 }
