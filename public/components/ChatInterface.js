@@ -126,48 +126,56 @@ function ChatInterface({ currentUser, onOpenAuth, onOpenPricing, onLogout }) {
     };
 
     const handleSendMessage = async (text, images, modelMode) => {
-        let sessionId = currentSessionId;
-        
-        // If no session exists (fresh load), create one now
-        if (!sessionId) {
-            const newSession = createSession();
-            sessionId = newSession.id;
-            setCurrentSessionId(sessionId);
-        }
+    let sessionId = currentSessionId;
 
-        const userMsg = {
-            role: 'user',
-            content: text,
-            images: images,
+    if (!sessionId) {
+        const newSession = createSession();
+        sessionId = newSession.id;
+        setCurrentSessionId(sessionId);
+    }
+
+    // CLEAN message for storage (NO IMAGES)
+    const cleanUserMsg = {
+        role: 'user',
+        content: text,
+        timestamp: new Date().toISOString()
+    };
+
+    // TEMP message for API (WITH IMAGES if any)
+    const apiUserMsg = images && images.length > 0
+        ? { ...cleanUserMsg, images }
+        : cleanUserMsg;
+
+    const apiMessages = [...messages, apiUserMsg];
+
+    // Store ONLY clean version locally
+    setMessages(prev => [...prev, cleanUserMsg]);
+    setIsTyping(true);
+
+    try {
+        const responseText = await generateAIResponse(apiMessages, modelMode);
+
+        const aiMsg = {
+            role: 'assistant',
+            content: responseText,
             timestamp: new Date().toISOString()
         };
-        
-        const newMessages = [...messages, userMsg];
-        setMessages(newMessages);
-        setIsTyping(true);
 
-        try {
-            const responseText = await generateAIResponse(newMessages, modelMode);
-            
-            const aiMsg = {
-                role: 'assistant',
-                content: responseText,
-                timestamp: new Date().toISOString()
-            };
-            
-            setMessages(prev => [...prev, aiMsg]);
-        } catch (error) {
-            console.error(error);
-            const errorMsg = {
-                role: 'assistant',
-                content: "I encountered an error processing your request.",
-                timestamp: new Date().toISOString()
-            };
-            setMessages(prev => [...prev, errorMsg]);
-        } finally {
-            setIsTyping(false);
-        }
-    };
+        setMessages(prev => [...prev, aiMsg]);
+    } catch (error) {
+        console.error(error);
+
+        const errorMsg = {
+            role: 'assistant',
+            content: "I encountered an error processing your request.",
+            timestamp: new Date().toISOString()
+        };
+
+        setMessages(prev => [...prev, errorMsg]);
+    } finally {
+        setIsTyping(false);
+    }
+};
 
     const handleEditMessage = async (index, newText) => {
         // 1. Slice history up to the edited message
