@@ -2,7 +2,8 @@
   "name": "aura-ai-app",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "build": "echo 'No build needed, serving public folder' "
+    "build": "echo 'No build needed, serving public folder'"
   }
 }
