@@ -1,6 +1,6 @@
 /**
- * SERVER-SIDE: Runs on Vercel
- * Handles secure API keys + rotation + proper vision handling
+ * SERVER-SIDE: Vercel API Route
+ * Secure API keys + rotation + correct vision handling
  */
 
 export default async function handler(req, res) {
@@ -31,28 +31,37 @@ export default async function handler(req, res) {
         );
 
         return res.status(200).json({ content: result });
+
     } catch (error) {
         console.error("Backend AI Error:", error);
         return res.status(500).json({ error: error.message });
     }
 }
 
-/* ---------------- ROTATION LOGIC ---------------- */
+
+/* =======================================================
+   🔁 KEY ROTATION
+======================================================= */
 
 async function callGroqAPIWithRotation(messages, modelMode, keys) {
+
     let lastError;
 
     for (let i = 0; i < keys.length; i++) {
+
         try {
             return await callGroqAPI(messages, modelMode, keys[i]);
+
         } catch (err) {
+
             lastError = err;
 
-            // Rotate only on rate limit
+            // rotate ONLY on rate limit
             if (
                 err.message.includes("429") ||
                 err.message.toLowerCase().includes("limit")
             ) {
+                console.warn(`Key ${i + 1} rate limited. Rotating...`);
                 continue;
             }
 
@@ -63,65 +72,81 @@ async function callGroqAPIWithRotation(messages, modelMode, keys) {
     throw new Error("All API keys are exhausted. Try again later.");
 }
 
-/* ---------------- CORE GROQ CALL ---------------- */
+
+/* =======================================================
+   🧠 CORE GROQ CALL
+======================================================= */
 
 async function callGroqAPI(messages, modelMode, apiKey) {
 
-    if (!messages.length) {
+    if (!Array.isArray(messages) || !messages.length) {
         throw new Error("No messages provided.");
     }
 
     const lastMessage = messages[messages.length - 1];
 
-    const hasImages =
+    const lastHasImages =
         lastMessage?.role === "user" &&
         Array.isArray(lastMessage?.images) &&
         lastMessage.images.length > 0;
 
-    const model = hasImages
+    // 🔥 MODEL AUTO SWITCH
+    const model = lastHasImages
         ? "llama-3.2-11b-vision-preview"
         : "llama-3.3-70b-versatile";
 
-    /* -------- CLEAN MESSAGE FORMAT -------- */
+
+    /* =======================================================
+       🧹 CLEAN MESSAGE FORMAT
+       - Only last user message can contain images
+       - All previous image blocks stripped
+       - No corrupted mixed content arrays
+    ======================================================= */
 
     const apiMessages = messages.map((msg, index) => {
 
-        // ONLY convert latest message to vision format
+        // --- LAST USER MESSAGE WITH IMAGES ---
         if (
             index === messages.length - 1 &&
             msg.role === "user" &&
-            hasImages
+            lastHasImages
         ) {
-            const content = [
-                {
-                    type: "text",
-                    text: msg.content || "Analyze this image."
-                }
-            ];
 
-            msg.images.forEach((url) => {
-                content.push({
-                    type: "image_url",
-                    image_url: { url }
-                });
+            const content = [];
+
+            content.push({
+                type: "text",
+                text: typeof msg.content === "string"
+                    ? msg.content
+                    : "Analyze this image."
             });
 
-            return { role: "user", content };
+            msg.images.forEach((url) => {
+                if (typeof url === "string" && url.startsWith("data:image")) {
+                    content.push({
+                        type: "image_url",
+                        image_url: { url }
+                    });
+                }
+            });
+
+            return {
+                role: "user",
+                content
+            };
         }
 
-        // Everything else becomes clean text
+        // --- ALL OTHER MESSAGES BECOME CLEAN TEXT ---
         return {
             role: msg.role,
-            content:
-                typeof msg.content === "string"
-                    ? msg.content
-                    : Array.isArray(msg.content)
-                        ? msg.content.find(c => c.type === "text")?.text || ""
-                        : ""
+            content: extractTextContent(msg.content)
         };
     });
 
-    /* -------- CALL GROQ -------- */
+
+    /* =======================================================
+       🚀 GROQ REQUEST
+    ======================================================= */
 
     const response = await fetch(
         "https://api.groq.com/openai/v1/chat/completions",
@@ -134,7 +159,10 @@ async function callGroqAPI(messages, modelMode, apiKey) {
             body: JSON.stringify({
                 model,
                 messages: [
-                    { role: "system", content: "You are Aura." },
+                    {
+                        role: "system",
+                        content: "You are Aura, a smart and helpful AI assistant."
+                    },
                     ...apiMessages
                 ],
                 temperature: 0.7,
@@ -155,4 +183,29 @@ async function callGroqAPI(messages, modelMode, apiKey) {
     }
 
     return data.choices[0].message.content.trim();
+}
+
+
+/* =======================================================
+   🧽 SAFE TEXT EXTRACTOR
+   Prevents old image arrays from breaking payload
+======================================================= */
+
+function extractTextContent(content) {
+
+    if (!content) return "";
+
+    if (typeof content === "string") {
+        return content;
+    }
+
+    if (Array.isArray(content)) {
+        const textBlock = content.find(
+            (c) => c.type === "text" && typeof c.text === "string"
+        );
+
+        return textBlock?.text || "";
+    }
+
+    return "";
 }
