@@ -169,6 +169,45 @@ function ChatInterface({ currentUser, onOpenAuth, onOpenPricing, onLogout }) {
         }
     };
 
+    const handleEditMessage = async (index, newText) => {
+        // 1. Slice history up to the edited message
+        // We keep everything BEFORE the edited message
+        const prevMessages = messages.slice(0, index);
+        
+        // 2. Create the new user message
+        const oldMsg = messages[index];
+        const newMsg = { ...oldMsg, content: newText, timestamp: new Date().toISOString() };
+        
+        // 3. Combine
+        const newHistory = [...prevMessages, newMsg];
+        setMessages(newHistory);
+        setIsTyping(true);
+
+        // 4. Regenerate from this point
+        try {
+             // Defaulting to Auto mode for regeneration, or we could track the original mode
+            const responseText = await generateAIResponse(newHistory, 'Auto');
+            
+            const aiMsg = {
+                role: 'assistant',
+                content: responseText,
+                timestamp: new Date().toISOString()
+            };
+            
+            setMessages(prev => [...prev, aiMsg]);
+        } catch (error) {
+             console.error(error);
+             const errorMsg = {
+                role: 'assistant',
+                content: "I encountered an error regenerating the response.",
+                timestamp: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, errorMsg]);
+        } finally {
+            setIsTyping(false);
+        }
+    };
+
     const handleDeleteSession = (e, sessionId) => {
         e.stopPropagation();
         if (confirm('Are you sure you want to delete this chat?')) {
@@ -630,7 +669,12 @@ function ChatInterface({ currentUser, onOpenAuth, onOpenPricing, onLogout }) {
                             {/* Messages */}
                             <div className="flex-1 w-full max-w-3xl mx-auto px-4 pt-20 pb-4">
                                 {messages.map((msg, idx) => (
-                                    <MessageBubble key={idx} message={msg} />
+                                    <MessageBubble 
+                                        key={idx} 
+                                        index={idx} 
+                                        message={msg} 
+                                        onEdit={handleEditMessage} 
+                                    />
                                 ))}
                                 
                                 {isTyping && (
