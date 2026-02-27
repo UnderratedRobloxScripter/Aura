@@ -35,12 +35,10 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-function AppContent() {
+function App() {
   const [currentUser, setCurrentUser] = React.useState(null);
   const [showAuthModal, setShowAuthModal] = React.useState(false);
   const [showPricingModal, setShowPricingModal] = React.useState(false);
-  
-  const { addNotification } = useNotification();
 
   React.useEffect(() => {
     // Check for persisted user
@@ -57,13 +55,12 @@ function AppContent() {
   const handleLogin = (user) => {
     setCurrentUser(user);
     localStorage.setItem('aura_user', JSON.stringify(user));
-    addNotification('success', `Welcome back, ${user.name}!`, 'Signed In');
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('aura_user');
-    addNotification('info', 'You have been logged out.', 'Signed Out');
+    // Also clear session if needed, or keep it local
   };
 
   const handleUpgrade = (planId) => {
@@ -79,40 +76,33 @@ function AppContent() {
     localStorage.setItem('aura_user', JSON.stringify(updatedUser));
     setShowPricingModal(false);
     
-    addNotification('success', `Successfully upgraded to ${planId === 'pro_plus' ? 'Pro+' : 'Pro'}!`, 'Plan Upgraded');
+    // Toast notification could go here
+    alert(`Successfully upgraded to ${planId === 'pro_plus' ? 'Pro+' : 'Pro'}!`);
   };
 
-  return (
-    <div data-name="app" data-file="app.js">
-      <ChatInterface 
-        currentUser={currentUser}
-        onOpenAuth={() => setShowAuthModal(true)}
-        onOpenPricing={() => setShowPricingModal(true)}
-        onLogout={handleLogout}
-      />
-      
-      <AuthModal 
-        isOpen={showAuthModal} 
-        onClose={() => setShowAuthModal(false)}
-        onLogin={handleLogin}
-      />
-
-      <PricingModal 
-        isOpen={showPricingModal}
-        onClose={() => setShowPricingModal(false)}
-        currentPlan={currentUser ? currentUser.plan : 'free'}
-        onUpgrade={handleUpgrade}
-      />
-    </div>
-  );
-}
-
-function App() {
   try {
     return (
-      <NotificationProvider>
-        <AppContent />
-      </NotificationProvider>
+      <div data-name="app" data-file="app.js">
+        <ChatInterface 
+          currentUser={currentUser}
+          onOpenAuth={() => setShowAuthModal(true)}
+          onOpenPricing={() => setShowPricingModal(true)}
+          onLogout={handleLogout}
+        />
+        
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => setShowAuthModal(false)}
+          onLogin={handleLogin}
+        />
+
+        <PricingModal 
+          isOpen={showPricingModal}
+          onClose={() => setShowPricingModal(false)}
+          currentPlan={currentUser ? currentUser.plan : 'free'}
+          onUpgrade={handleUpgrade}
+        />
+      </div>
     );
   } catch (error) {
     console.error('App component error:', error);
