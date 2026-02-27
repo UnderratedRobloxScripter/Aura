@@ -1,4 +1,4 @@
-// Important: DO NOT remove this ErrorBoundary component.
+// Important: DO NOT remove this `ErrorBoundary` component.
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -30,36 +30,17 @@ class ErrorBoundary extends React.Component {
         </div>
       );
     }
+
     return this.props.children;
   }
 }
 
-/**
- * The Secure API Caller
- * This talks to your Vercel Middleman (/api/chat.js) so keys don't leak.
- */
-async function generateAIResponse(messages, modelMode = 'Auto') {
-  try {
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, modelMode })
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "API error");
-
-    return data.content;
-  } catch (error) {
-    console.error('AI Generation Error:', error);
-    return "An error occured, Please try again later. (Error: " + error.message + ")";
-  }
-}
-
-function App() {
+function AppContent() {
   const [currentUser, setCurrentUser] = React.useState(null);
   const [showAuthModal, setShowAuthModal] = React.useState(false);
   const [showPricingModal, setShowPricingModal] = React.useState(false);
+  
+  const { addNotification } = useNotification();
 
   React.useEffect(() => {
     // Check for persisted user
@@ -76,11 +57,13 @@ function App() {
   const handleLogin = (user) => {
     setCurrentUser(user);
     localStorage.setItem('aura_user', JSON.stringify(user));
+    addNotification('success', `Welcome back, ${user.name}!`, 'Signed In');
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('aura_user');
+    addNotification('info', 'You have been logged out.', 'Signed Out');
   };
 
   const handleUpgrade = (planId) => {
@@ -95,34 +78,41 @@ function App() {
     setCurrentUser(updatedUser);
     localStorage.setItem('aura_user', JSON.stringify(updatedUser));
     setShowPricingModal(false);
-    alert(`Successfully upgraded to ${planId === 'pro_plus' ? 'Pro+' : 'Pro'}!`);
+    
+    addNotification('success', `Successfully upgraded to ${planId === 'pro_plus' ? 'Pro+' : 'Pro'}!`, 'Plan Upgraded');
   };
 
+  return (
+    <div data-name="app" data-file="app.js">
+      <ChatInterface 
+        currentUser={currentUser}
+        onOpenAuth={() => setShowAuthModal(true)}
+        onOpenPricing={() => setShowPricingModal(true)}
+        onLogout={handleLogout}
+      />
+      
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)}
+        onLogin={handleLogin}
+      />
+
+      <PricingModal 
+        isOpen={showPricingModal}
+        onClose={() => setShowPricingModal(false)}
+        currentPlan={currentUser ? currentUser.plan : 'free'}
+        onUpgrade={handleUpgrade}
+      />
+    </div>
+  );
+}
+
+function App() {
   try {
     return (
-      <div data-name="app" data-file="app.js">
-        <ChatInterface 
-          currentUser={currentUser}
-          onOpenAuth={() => setShowAuthModal(true)}
-          onOpenPricing={() => setShowPricingModal(true)}
-          onLogout={handleLogout}
-          // PASS THE SECURE FUNCTION TO THE INTERFACE
-          generateAIResponse={generateAIResponse} 
-        />
-        
-        <AuthModal 
-          isOpen={showAuthModal} 
-          onClose={() => setShowAuthModal(false)}
-          onLogin={handleLogin}
-        />
-
-        <PricingModal 
-          isOpen={showPricingModal}
-          onClose={() => setShowPricingModal(false)}
-          currentPlan={currentUser ? currentUser.plan : 'free'}
-          onUpgrade={handleUpgrade}
-        />
-      </div>
+      <NotificationProvider>
+        <AppContent />
+      </NotificationProvider>
     );
   } catch (error) {
     console.error('App component error:', error);
@@ -130,7 +120,6 @@ function App() {
   }
 }
 
-// Render the app into the root div
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <ErrorBoundary>
